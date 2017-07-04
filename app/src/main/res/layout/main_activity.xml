@@ -3,29 +3,60 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:orientation="vertical"
     android:paddingBottom="@dimen/activity_vertical_margin"
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
-    android:paddingTop="@dimen/activity_vertical_margin"
-    android:orientation="vertical">
+    android:paddingTop="@dimen/activity_vertical_margin">
 
-    <Button
-        android:id="@+id/add_geofences_button"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:onClick="addGeofencesButtonHandler"
-        android:text="@string/add_geofences" />
+        android:orientation="horizontal">
 
-    <Button
-        android:id="@+id/remove_geofences_button"
-        android:layout_width="wrap_content"
+        <Button
+            android:id="@+id/add_geofences_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:onClick="addGeofencesButtonHandler"
+            android:text="@string/add_geofences" />
+
+        <Button
+            android:id="@+id/remove_geofences_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:onClick="removeGeofencesButtonHandler"
+            android:text="@string/remove_geofences" />
+    </LinearLayout>
+
+
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:onClick="removeGeofencesButtonHandler"
-        android:text="@string/remove_geofences" />
+        android:padding="10dp"
+        android:onClick="selectWifiButton"
+        android:background="?attr/selectableItemBackground"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/selected_wifi"/>
+
+        <TextView
+            android:id="@+id/wifi_name"
+            android:layout_marginLeft="10dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/none"/>
+    </LinearLayout>
 
     <fragment
         android:id="@+id/map"
         android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_marginTop="10dp"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         tools:context="com.vail.myapplication.MainActivity" />

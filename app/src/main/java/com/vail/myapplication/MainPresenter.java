@@ -2,17 +2,20 @@ package com.vail.myapplication;
 
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.wifi.ScanResult;
 import android.support.annotation.NonNull;
 import android.util.Log;
 
 import com.google.android.gms.location.Geofence;
+import com.google.android.gms.location.GeofencingClient;
 import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.Task;
+import com.vail.myapplication.wifi.WifiSensor;
 
 import java.util.ArrayList;
-import java.util.Map;
+import java.util.List;
 
 import static android.content.ContentValues.TAG;
 
@@ -24,8 +27,12 @@ public class MainPresenter implements MainContract.Presenter {
 
     private MainContract.View view;
     private SharedPreferences sharedPreferences;
+    private WifiSensor wifiSensor;
+    private GeofencingClient geofencingClient;
     private GoogleMap mMap;
     private PendingGeofenceTask mPendingGeofenceTask = PendingGeofenceTask.NONE;
+
+    private int radius = 30;
 
     private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 34;
 
@@ -35,9 +42,11 @@ public class MainPresenter implements MainContract.Presenter {
         ADD, REMOVE, NONE
     }
 
-    public MainPresenter(MainContract.View view, SharedPreferences sharedPreferences) {
+    public MainPresenter(MainContract.View view, SharedPreferences sharedPreferences, WifiSensor wifiSensor, GeofencingClient geofencingClient) {
         this.view = view;
         this.sharedPreferences = sharedPreferences;
+        this.wifiSensor = wifiSensor;
+        this.geofencingClient = geofencingClient;
 
         mGeofenceList = new ArrayList<>();
         populateGeofenceList();
@@ -45,10 +54,14 @@ public class MainPresenter implements MainContract.Presenter {
     }
 
     @Override
+    @SuppressWarnings("MissingPermission")
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (requestCode == REQUEST_PERMISSIONS_REQUEST_CODE && grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.i(TAG, "Permission granted.");
+                if (mMap != null) {
+                    mMap.setMyLocationEnabled(true);
+                }
                 performPendingGeofenceTask();
             } else {
                 // Permission denied.
@@ -68,21 +81,53 @@ public class MainPresenter implements MainContract.Presenter {
     }
 
     @Override
+    @SuppressWarnings("MissingPermission")
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
+        if (!view.checkPermissions()) {
+            view.requestPermissions(REQUEST_PERMISSIONS_REQUEST_CODE);
+            return;
+        }
 
+        mMap.setMyLocationEnabled(true);
         // Add a marker in Sydney and move the camera
 //        LatLng sydney = new LatLng(-34, 151);
 //        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
 //        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
     }
 
+    @SuppressWarnings("MissingPermission")
+    public void addGeofences() {
+        if (!view.checkPermissions()) {
+            view.showSnackbar(R.string.insufficient_permissions);
+            return;
+        }
+
+        wifiSensor.start();
+        geofencingClient.addGeofences(getGeofencingRequest(), view.getGeofencePendingIntent())
+                .addOnCompleteListener(this);
+    }
+
+    public void removeGeofences() {
+        if (!view.checkPermissions()) {
+            view.showSnackbar(R.string.insufficient_permissions);
+            return;
+        }
+
+        wifiSensor.stop();
+        view.setWifiName("None");
+        sharedPreferences.edit()
+                .remove(WifiSensor.WIFI_NAME_KEY)
+                .remove(WifiSensor.WIFI_BSSID_KEY)
+                .apply();
+        geofencingClient.removeGeofences(view.getGeofencePendingIntent()).addOnCompleteListener(this);
+    }
 
     private void performPendingGeofenceTask() {
         if (mPendingGeofenceTask == PendingGeofenceTask.ADD) {
-            view.addGeofences();
+            addGeofences();
         } else if (mPendingGeofenceTask == PendingGeofenceTask.REMOVE) {
-            view.removeGeofences();
+            removeGeofences();
         }
     }
 
@@ -93,7 +138,7 @@ public class MainPresenter implements MainContract.Presenter {
             view.requestPermissions(REQUEST_PERMISSIONS_REQUEST_CODE);
             return;
         }
-        view.removeGeofences();
+        removeGeofences();
     }
 
     @Override
@@ -103,7 +148,29 @@ public class MainPresenter implements MainContract.Presenter {
             view.requestPermissions(REQUEST_PERMISSIONS_REQUEST_CODE);
             return;
         }
-        view.addGeofences();
+        addGeofences();
+    }
+
+    @Override
+    public void onWifiButtonClick() {
+        List<ScanResult> resultList = wifiSensor.getScanResults();
+        if (resultList.isEmpty()) {
+            view.showToast(R.string.no_wifi_points);
+        } else {
+            view.showListDialog(resultList);
+        }
+    }
+
+    @Override
+    public void onSelectItem(ScanResult scanResult) {
+        String ssid = scanResult.SSID;
+        String bssid = scanResult.BSSID;
+        sharedPreferences.edit()
+                .putString(WifiSensor.WIFI_NAME_KEY, ssid)
+                .putString(WifiSensor.WIFI_BSSID_KEY, bssid)
+                .apply();
+
+        view.setWifiName(ssid);
     }
 
     @Override
@@ -140,21 +207,26 @@ public class MainPresenter implements MainContract.Presenter {
     }
 
     private void populateGeofenceList() {
-        //TODO
-        for (Map.Entry<String, LatLng> entry : Constants.BAY_AREA_LANDMARKS.entrySet()) {
+        LatLng latLng = mMap.getCameraPosition().target;
+        sharedPreferences.edit()
+                .putString(Constants.LATITUDE_KEY, String.valueOf(latLng.latitude))
+                .putString(Constants.LONGITUDE_KEY, String.valueOf(latLng.longitude))
+                .putInt(Constants.RADIUS_KEY, radius)
+                .apply();
 
-            mGeofenceList.add(new Geofence.Builder()
-                    .setRequestId(entry.getKey())
-                    .setCircularRegion(
-                            entry.getValue().latitude,
-                            entry.getValue().longitude,
-                            Constants.GEOFENCE_RADIUS_IN_METERS
-                    )
-                    .setExpirationDuration(Constants.GEOFENCE_EXPIRATION_IN_MILLISECONDS)
-                    .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
-                            Geofence.GEOFENCE_TRANSITION_EXIT)
-                    .build());
-        }
+        mGeofenceList.clear();
+
+        mGeofenceList.add(new Geofence.Builder()
+                .setRequestId("First")
+                .setCircularRegion(
+                        latLng.latitude,
+                        latLng.longitude,
+                        radius
+                )
+                .setExpirationDuration(Constants.GEOFENCE_EXPIRATION_IN_MILLISECONDS)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER |
+                        Geofence.GEOFENCE_TRANSITION_EXIT)
+                .build());
     }
 
     @Override

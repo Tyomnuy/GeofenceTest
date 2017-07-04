@@ -21,20 +21,21 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.preference.PreferenceManager;
+import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
-import android.text.TextUtils;
 import android.util.Log;
 
 import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.GeofencingEvent;
+import com.vail.myapplication.Constants;
 import com.vail.myapplication.MainActivity;
 import com.vail.myapplication.R;
-
-import java.util.ArrayList;
-import java.util.List;
+import com.vail.myapplication.wifi.WifiSensor;
 
 /**
  * Listener for geofence transition changes.
@@ -46,6 +47,7 @@ import java.util.List;
 public class GeofenceTransitionsIntentService extends IntentService {
 
     private static final String TAG = "GeofenceTransitionsIS";
+    private SharedPreferences sharedPreferences;
 
     /**
      * This constructor is required, and calls the super IntentService(String)
@@ -56,6 +58,12 @@ public class GeofenceTransitionsIntentService extends IntentService {
         super(TAG);
     }
 
+    @Override
+    public void onStart(@Nullable Intent intent, int startId) {
+        super.onStart(intent, startId);
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+    }
+
     /**
      * Handles incoming intents.
      * @param intent sent by Location Services. This Intent is provided to Location
@@ -63,6 +71,21 @@ public class GeofenceTransitionsIntentService extends IntentService {
      */
     @Override
     protected void onHandleIntent(Intent intent) {
+        if (intent.hasExtra(WifiSensor.WIFI_ACCESSIBILITY_KEY)) {
+            processWifiChanged(intent);
+        } else {
+            processGeofenceChanged(intent);
+        }
+    }
+
+    private void processWifiChanged(Intent intent) {
+        boolean wifiAccessible = intent.getBooleanExtra(WifiSensor.WIFI_ACCESSIBILITY_KEY, false);
+
+        boolean oldGeofenceState = sharedPreferences.getBoolean(Constants.IN_GEOFENCE_ZONE_KEY, false);
+        updateInZoneValue(wifiAccessible, oldGeofenceState);
+    }
+
+    private void processGeofenceChanged(Intent intent) {
         GeofencingEvent geofencingEvent = GeofencingEvent.fromIntent(intent);
         if (geofencingEvent.hasError()) {
             String errorMessage = GeofenceErrorMessages.getErrorString(this,
@@ -71,57 +94,33 @@ public class GeofenceTransitionsIntentService extends IntentService {
             return;
         }
 
-        // Get the transition type.
         int geofenceTransition = geofencingEvent.getGeofenceTransition();
-
-        // Test that the reported transition was of interest.
         if (geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER ||
                 geofenceTransition == Geofence.GEOFENCE_TRANSITION_EXIT) {
 
-            // Get the geofences that were triggered. A single event can trigger multiple geofences.
-            List<Geofence> triggeringGeofences = geofencingEvent.getTriggeringGeofences();
-
-            // Get the transition details as a String.
-            String geofenceTransitionDetails = getGeofenceTransitionDetails(geofenceTransition,
-                    triggeringGeofences);
-
-            // Send notification and log the transition details.
-            sendNotification(geofenceTransitionDetails);
-            Log.i(TAG, geofenceTransitionDetails);
-        } else {
-            // Log the error.
-            Log.e(TAG, getString(R.string.geofence_transition_invalid_type, geofenceTransition));
+            boolean oldWifiState = sharedPreferences.getBoolean(Constants.WIFI_ACCESSIBLE_KEY, false);
+            updateInZoneValue(oldWifiState, geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER);
         }
     }
 
-    /**
-     * Gets transition details and returns them as a formatted string.
-     *
-     * @param geofenceTransition    The ID of the geofence transition.
-     * @param triggeringGeofences   The geofence(s) triggered.
-     * @return                      The transition details formatted as String.
-     */
-    private String getGeofenceTransitionDetails(
-            int geofenceTransition,
-            List<Geofence> triggeringGeofences) {
+    private void updateInZoneValue(boolean wifi, boolean geofence) {
+        boolean oldWifiState = sharedPreferences.getBoolean(Constants.WIFI_ACCESSIBLE_KEY, false);
+        boolean oldGeofenceState = sharedPreferences.getBoolean(Constants.IN_GEOFENCE_ZONE_KEY, false);
 
-        String geofenceTransitionString = getTransitionString(geofenceTransition);
+        sharedPreferences.edit()
+                .putBoolean(Constants.WIFI_ACCESSIBLE_KEY, wifi)
+                .putBoolean(Constants.IN_GEOFENCE_ZONE_KEY, geofence)
+                .apply();
+        if ((wifi || geofence) && (oldWifiState || oldGeofenceState)) return;
 
-        // Get the Ids of each geofence that was triggered.
-        ArrayList<String> triggeringGeofencesIdsList = new ArrayList<>();
-        for (Geofence geofence : triggeringGeofences) {
-            triggeringGeofencesIdsList.add(geofence.getRequestId());
-        }
-        String triggeringGeofencesIdsString = TextUtils.join(", ",  triggeringGeofencesIdsList);
-
-        return geofenceTransitionString + ": " + triggeringGeofencesIdsString;
+        sendNotification(wifi || geofence);
     }
 
     /**
      * Posts a notification in the notification bar when a transition is detected.
      * If the user clicks the notification, control goes to the MainActivity.
      */
-    private void sendNotification(String notificationDetails) {
+    private void sendNotification(boolean enter) {
         // Create an explicit content Intent that starts the main Activity.
         Intent notificationIntent = new Intent(getApplicationContext(), MainActivity.class);
 
@@ -148,7 +147,7 @@ public class GeofenceTransitionsIntentService extends IntentService {
                 .setLargeIcon(BitmapFactory.decodeResource(getResources(),
                         R.mipmap.ic_launcher))
                 .setColor(Color.RED)
-                .setContentTitle(notificationDetails)
+                .setContentTitle(getString(enter ? R.string.geofence_transition_entered : R.string.geofence_transition_exited))
                 .setContentText(getString(R.string.geofence_transition_notification_text))
                 .setContentIntent(notificationPendingIntent);
 

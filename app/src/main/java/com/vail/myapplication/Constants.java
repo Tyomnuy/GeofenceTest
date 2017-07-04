@@ -24,10 +24,17 @@ import java.util.HashMap;
  * Constants used in this sample.
  */
 
-final class Constants {
+public final class Constants {
 
     private Constants() {
     }
+
+    public static final String LATITUDE_KEY = "LATITUDE_KEY";
+    public static final String LONGITUDE_KEY = "LONGITUDE_KEY";
+    public static final String RADIUS_KEY = "RADIUS_KEY";
+
+    public static final String WIFI_ACCESSIBLE_KEY = "WIFI_ACCESSIBLE_KEY";
+    public static final String IN_GEOFENCE_ZONE_KEY = "IN_GEOFENCE_ZONE_KEY";
 
     private static final String PACKAGE_NAME = "com.google.android.gms.location.Geofence";
 

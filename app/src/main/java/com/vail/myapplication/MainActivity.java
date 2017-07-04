@@ -1,10 +1,14 @@
 package com.vail.myapplication;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.app.PendingIntent;
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.net.wifi.ScanResult;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
@@ -14,13 +18,17 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.location.GeofencingClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.vail.myapplication.geofencing.GeofenceTransitionsIntentService;
+import com.vail.myapplication.wifi.WifiSensor;
+
+import java.util.List;
 
 public class MainActivity extends FragmentActivity implements MainContract.View {
 
@@ -28,20 +36,20 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
 
     private MainContract.Presenter presenter;
 
-    private GeofencingClient mGeofencingClient;
-
     private PendingIntent mGeofencePendingIntent;
 
-    // Buttons for kicking off the process of adding or removing geofences.
     private Button mAddGeofencesButton;
     private Button mRemoveGeofencesButton;
+    private TextView wifiNameTv;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main_activity);
 
-        presenter = new MainPresenter(this, PreferenceManager.getDefaultSharedPreferences(this));
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        presenter = new MainPresenter(this, preferences, new WifiSensor(this, preferences),
+                LocationServices.getGeofencingClient(this));
 
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -49,10 +57,9 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
 
         mAddGeofencesButton = (Button) findViewById(R.id.add_geofences_button);
         mRemoveGeofencesButton = (Button) findViewById(R.id.remove_geofences_button);
+        wifiNameTv = (TextView) findViewById(R.id.wifi_name);
 
         mGeofencePendingIntent = null;
-
-        mGeofencingClient = LocationServices.getGeofencingClient(this);
     }
 
     @Override
@@ -66,34 +73,16 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
         presenter.onAddGeofencesClick();
     }
 
-    @Override
-    @SuppressWarnings("MissingPermission")
-    public void addGeofences() {
-        if (!checkPermissions()) {
-            showSnackbar(getString(R.string.insufficient_permissions));
-            return;
-        }
-
-        mGeofencingClient.addGeofences(presenter.getGeofencingRequest(), getGeofencePendingIntent())
-                .addOnCompleteListener(presenter);
-    }
-
     public void removeGeofencesButtonHandler(View view) {
         presenter.onRemoveGeofencesClick();
     }
 
-    @Override
-    @SuppressWarnings("MissingPermission")
-    public void removeGeofences() {
-        if (!checkPermissions()) {
-            showSnackbar(getString(R.string.insufficient_permissions));
-            return;
-        }
-
-        mGeofencingClient.removeGeofences(getGeofencePendingIntent()).addOnCompleteListener(presenter);
+    public void selectWifiButton(View view) {
+        presenter.onWifiButtonClick();
     }
 
-    private PendingIntent getGeofencePendingIntent() {
+    @Override
+    public PendingIntent getGeofencePendingIntent() {
         // Reuse the PendingIntent if we already have it.
         if (mGeofencePendingIntent != null) {
             return mGeofencePendingIntent;
@@ -110,15 +99,11 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
         mRemoveGeofencesButton.setEnabled(!geofencesEnabled);
     }
 
-    /**
-     * Shows a {@link Snackbar} using {@code text}.
-     *
-     * @param text The Snackbar text.
-     */
-    private void showSnackbar(final String text) {
+    @Override
+    public void showSnackbar(final int stringId) {
         View container = findViewById(android.R.id.content);
         if (container != null) {
-            Snackbar.make(container, text, Snackbar.LENGTH_LONG).show();
+            Snackbar.make(container, getString(stringId), Snackbar.LENGTH_LONG).show();
         }
     }
 
@@ -205,5 +190,31 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
                         startActivity(intent);
                     }
                 });
+    }
+
+    public void showListDialog(final List<ScanResult> scanResults) {
+        AlertDialog.Builder builderSingle = new AlertDialog.Builder(this);
+        builderSingle.setTitle(R.string.select_wifi);
+
+        final ArrayAdapter<String> arrayAdapter = new ArrayAdapter<>(this, android.R.layout.select_dialog_singlechoice);
+        for (ScanResult scanResult: scanResults) {
+            arrayAdapter.add(scanResult.SSID);
+        }
+
+        builderSingle.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.dismiss();
+            }
+        });
+
+        builderSingle.setAdapter(arrayAdapter, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                presenter.onSelectItem(scanResults.get(which));
+                dialog.dismiss();
+            }
+        });
+        builderSingle.show();
     }
 }
