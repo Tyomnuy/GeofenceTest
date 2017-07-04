@@ -7,7 +7,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.net.Uri;
 import android.net.wifi.ScanResult;
 import android.os.Bundle;
@@ -17,6 +16,7 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -26,13 +26,20 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdate;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.CircleOptions;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.vail.myapplication.geofencing.GeofenceTransitionsIntentService;
 import com.vail.myapplication.wifi.WifiSensor;
 
 import java.util.List;
 
-public class MainActivity extends FragmentActivity implements MainContract.View, SeekBar.OnSeekBarChangeListener {
+public class MainActivity extends FragmentActivity implements MainContract.View, SeekBar.OnSeekBarChangeListener, OnMapReadyCallback, GoogleMap.OnCameraIdleListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -45,6 +52,7 @@ public class MainActivity extends FragmentActivity implements MainContract.View,
     private TextView wifiNameTv;
     private TextView radiusTv;
     private SeekBar radiusSeekBar;
+    private GoogleMap mMap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,7 +65,7 @@ public class MainActivity extends FragmentActivity implements MainContract.View,
 
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
-        mapFragment.getMapAsync(presenter);
+        mapFragment.getMapAsync(this);
 
         mAddGeofencesButton = (Button) findViewById(R.id.add_geofences_button);
         mRemoveGeofencesButton = (Button) findViewById(R.id.remove_geofences_button);
@@ -91,20 +99,17 @@ public class MainActivity extends FragmentActivity implements MainContract.View,
 
     @Override
     public PendingIntent getGeofencePendingIntent() {
-        // Reuse the PendingIntent if we already have it.
         if (mGeofencePendingIntent != null) {
             return mGeofencePendingIntent;
         }
         Intent intent = new Intent(this, GeofenceTransitionsIntentService.class);
-        // We use FLAG_UPDATE_CURRENT so that we get the same pending intent back when calling
-        // addGeofences() and removeGeofences().
         return PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     @Override
     public void setButtonsEnabledState(boolean geofencesEnabled) {
-        mAddGeofencesButton.setEnabled(geofencesEnabled);
-        mRemoveGeofencesButton.setEnabled(!geofencesEnabled);
+        mAddGeofencesButton.setEnabled(!geofencesEnabled);
+        mRemoveGeofencesButton.setEnabled(geofencesEnabled);
     }
 
     @Override
@@ -253,5 +258,52 @@ public class MainActivity extends FragmentActivity implements MainContract.View,
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
 
+    }
+
+    @Override
+    @SuppressWarnings("MissingPermission")
+    public void onMapReady(GoogleMap googleMap) {
+        mMap = googleMap;
+        mMap.setOnCameraIdleListener(this);
+
+        presenter.onMapReady();
+    }
+
+    @Override
+    @SuppressWarnings("MissingPermission")
+    public void enableMyLocation() {
+        if (mMap != null) {
+            mMap.setMyLocationEnabled(true);
+        }
+    }
+
+    @Override
+    public void onCameraIdle() {
+        presenter.onCameraPositionChanged();
+    }
+
+    @Override
+    public void updateMarker() {
+        if (mMap == null) return;
+        LatLng latLng = mMap.getCameraPosition().target;
+        mMap.clear();
+
+        mMap.addCircle(new CircleOptions()
+                .center(latLng)
+                .radius(radiusSeekBar.getProgress() + Constants.MIN_RADIUS)
+                .strokeColor(ContextCompat.getColor(this, R.color.strokeColor))
+                .fillColor(ContextCompat.getColor(this, R.color.fillColor)));
+        mMap.addMarker(new MarkerOptions().position(latLng));
+    }
+
+    @Override
+    public LatLng getLatLng() {
+        if (mMap == null) return null;
+        return mMap.getCameraPosition().target;
+    }
+
+    @Override
+    public void navigateMap(LatLng latLng) {
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15));
     }
 }

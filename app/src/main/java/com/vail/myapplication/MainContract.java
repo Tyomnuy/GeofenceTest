@@ -4,7 +4,7 @@ import android.app.PendingIntent;
 import android.net.wifi.ScanResult;
 
 import com.google.android.gms.location.GeofencingRequest;
-import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.OnCompleteListener;
 
 import java.util.List;
@@ -35,9 +35,17 @@ public class MainContract {
         void setWifiName(String ssid);
 
         void setRadius(int radius);
+
+        void enableMyLocation();
+
+        void updateMarker();
+
+        LatLng getLatLng();
+
+        void navigateMap(LatLng latLng);
     }
 
-    interface Presenter extends OnMapReadyCallback, OnCompleteListener<Void> {
+    interface Presenter extends OnCompleteListener<Void> {
         void onStart();
 
         void onAddGeofencesClick();
@@ -53,5 +61,9 @@ public class MainContract {
         void onSelectItem(ScanResult scanResult);
 
         void onRadiusChanged(int radius);
+
+        void onMapReady();
+
+        void onCameraPositionChanged();
     }
 }

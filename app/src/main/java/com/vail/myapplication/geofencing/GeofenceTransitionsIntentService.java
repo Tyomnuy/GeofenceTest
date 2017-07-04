@@ -111,7 +111,7 @@ public class GeofenceTransitionsIntentService extends IntentService {
                 .putBoolean(Constants.WIFI_ACCESSIBLE_KEY, wifi)
                 .putBoolean(Constants.IN_GEOFENCE_ZONE_KEY, geofence)
                 .apply();
-        if ((wifi || geofence) && (oldWifiState || oldGeofenceState)) return;
+        if ((wifi || geofence) == (oldWifiState || oldGeofenceState)) return;
 
         sendNotification(wifi || geofence);
     }

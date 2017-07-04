@@ -9,9 +9,7 @@ import android.util.Log;
 import com.google.android.gms.location.Geofence;
 import com.google.android.gms.location.GeofencingClient;
 import com.google.android.gms.location.GeofencingRequest;
-import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.Task;
 import com.vail.myapplication.wifi.WifiSensor;
 
@@ -24,13 +22,13 @@ import static android.content.ContentValues.TAG;
  * Created by Vail on 04.07.17
  */
 
-public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCameraIdleListener {
+public class MainPresenter implements MainContract.Presenter {
 
     private MainContract.View view;
     private SharedPreferences sharedPreferences;
     private WifiSensor wifiSensor;
     private GeofencingClient geofencingClient;
-    private GoogleMap mMap;
+
     private PendingGeofenceTask mPendingGeofenceTask = PendingGeofenceTask.NONE;
 
     private int radius;
@@ -50,12 +48,7 @@ public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCamera
         this.geofencingClient = geofencingClient;
 
         radius = sharedPreferences.getInt(Constants.RADIUS_KEY, 30);
-        view.setWifiName(sharedPreferences.getString(Constants.WIFI_NAME_KEY, "None"));
-        view.setRadius(radius);
-
         mGeofenceList = new ArrayList<>();
-        populateGeofenceList();
-        view.setButtonsEnabledState(getGeofencesAdded());
     }
 
     @Override
@@ -64,9 +57,7 @@ public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCamera
         if (requestCode == REQUEST_PERMISSIONS_REQUEST_CODE && grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.i(TAG, "Permission granted.");
-                if (mMap != null) {
-                    mMap.setMyLocationEnabled(true);
-                }
+                view.enableMyLocation();
                 performPendingGeofenceTask();
             } else {
                 // Permission denied.
@@ -78,33 +69,15 @@ public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCamera
 
     @Override
     public void onStart() {
+        view.setWifiName(sharedPreferences.getString(Constants.WIFI_NAME_KEY, "None"));
+        view.setRadius(radius);
+        view.setButtonsEnabledState(getGeofencesAdded());
+
         if (!view.checkPermissions()) {
             view.requestPermissions(REQUEST_PERMISSIONS_REQUEST_CODE);
         } else {
             performPendingGeofenceTask();
         }
-    }
-
-    @Override
-    @SuppressWarnings("MissingPermission")
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
-        mMap.setOnCameraIdleListener(this);
-
-        LatLng latLng = mMap.getCameraPosition().target;
-        mMap.clear();
-        mMap.addMarker(new MarkerOptions().position(latLng));
-
-        if (!view.checkPermissions()) {
-            view.requestPermissions(REQUEST_PERMISSIONS_REQUEST_CODE);
-            return;
-        }
-
-        mMap.setMyLocationEnabled(true);
-        // Add a marker in Sydney and move the camera
-//        LatLng sydney = new LatLng(-34, 151);
-//        mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
-//        mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
     }
 
     @SuppressWarnings("MissingPermission")
@@ -187,6 +160,7 @@ public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCamera
     @Override
     public void onRadiusChanged(int radius) {
         this.radius = radius;
+        view.updateMarker();
     }
 
     @Override
@@ -223,14 +197,15 @@ public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCamera
     }
 
     private void populateGeofenceList() {
-        LatLng latLng = mMap.getCameraPosition().target;
+        mGeofenceList.clear();
+        LatLng latLng = view.getLatLng();
+        if (latLng == null) return;
+
         sharedPreferences.edit()
                 .putString(Constants.LATITUDE_KEY, String.valueOf(latLng.latitude))
                 .putString(Constants.LONGITUDE_KEY, String.valueOf(latLng.longitude))
                 .putInt(Constants.RADIUS_KEY, radius)
                 .apply();
-
-        mGeofenceList.clear();
 
         mGeofenceList.add(new Geofence.Builder()
                 .setRequestId("First")
@@ -247,6 +222,7 @@ public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCamera
 
     @Override
     public GeofencingRequest getGeofencingRequest() {
+        populateGeofenceList();
         return new GeofencingRequest.Builder()
                 .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
                 .addGeofences(mGeofenceList)
@@ -254,9 +230,25 @@ public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCamera
     }
 
     @Override
-    public void onCameraIdle() {
-        LatLng latLng = mMap.getCameraPosition().target;
-        mMap.clear();
-        mMap.addMarker(new MarkerOptions().position(latLng));
+    public void onMapReady() {
+        if (sharedPreferences.contains(Constants.LATITUDE_KEY)) {
+            double latitude = Double.parseDouble(sharedPreferences.getString(Constants.LATITUDE_KEY,"0"));
+            double longitude = Double.parseDouble(sharedPreferences.getString(Constants.LONGITUDE_KEY,"0"));
+            view.navigateMap(new LatLng(latitude, longitude));
+        } else {
+            view.updateMarker();
+        }
+
+        if (!view.checkPermissions()) {
+            view.requestPermissions(REQUEST_PERMISSIONS_REQUEST_CODE);
+            return;
+        }
+
+        view.enableMyLocation();
+    }
+
+    @Override
+    public void onCameraPositionChanged() {
+        view.updateMarker();
     }
 }

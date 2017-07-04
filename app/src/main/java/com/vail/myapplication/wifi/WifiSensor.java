@@ -17,7 +17,6 @@ import java.util.List;
 /**
  * Created by Vail on 04.07.17
  */
-
 public class WifiSensor extends BroadcastReceiver {
 
     public static final String WIFI_ACCESSIBILITY_KEY = "WIFI_ACCESSIBILITY";
@@ -36,13 +35,17 @@ public class WifiSensor extends BroadcastReceiver {
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION);
         intentFilter.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
+        intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         context.registerReceiver(this, intentFilter);
 
-        updateCurrentWifiConnection();
+        wifiManager.startScan();
     }
 
     public void stop() {
-        context.unregisterReceiver(this);
+        try {
+            context.unregisterReceiver(this);
+        } catch (IllegalArgumentException e) {
+        }
     }
 
     @Override
