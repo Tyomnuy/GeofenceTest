@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package com.vail.myapplication;
+package com.vail.myapplication.geofencing;
 
 import android.content.Context;
 import android.content.res.Resources;
 
 import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.location.GeofenceStatusCodes;
+import com.vail.myapplication.R;
 
 /**
  * Geofence error codes mapped to error messages.
