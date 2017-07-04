@@ -41,7 +41,8 @@ public class MainPresenter implements MainContract.Presenter {
         ADD, REMOVE, NONE
     }
 
-    public MainPresenter(MainContract.View view, SharedPreferences sharedPreferences, WifiSensor wifiSensor, GeofencingClient geofencingClient) {
+    public MainPresenter(MainContract.View view, SharedPreferences sharedPreferences,
+                         WifiSensor wifiSensor, GeofencingClient geofencingClient) {
         this.view = view;
         this.sharedPreferences = sharedPreferences;
         this.wifiSensor = wifiSensor;
