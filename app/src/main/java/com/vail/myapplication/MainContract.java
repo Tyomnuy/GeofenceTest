@@ -33,6 +33,8 @@ public class MainContract {
         void showListDialog(List<ScanResult> resultList);
 
         void setWifiName(String ssid);
+
+        void setRadius(int radius);
     }
 
     interface Presenter extends OnMapReadyCallback, OnCompleteListener<Void> {
@@ -49,5 +51,7 @@ public class MainContract {
         void onWifiButtonClick();
 
         void onSelectItem(ScanResult scanResult);
+
+        void onRadiusChanged(int radius);
     }
 }

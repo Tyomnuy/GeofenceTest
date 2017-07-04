@@ -7,6 +7,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.net.wifi.ScanResult;
 import android.os.Bundle;
@@ -20,6 +21,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,7 +32,7 @@ import com.vail.myapplication.wifi.WifiSensor;
 
 import java.util.List;
 
-public class MainActivity extends FragmentActivity implements MainContract.View {
+public class MainActivity extends FragmentActivity implements MainContract.View, SeekBar.OnSeekBarChangeListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -41,6 +43,8 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
     private Button mAddGeofencesButton;
     private Button mRemoveGeofencesButton;
     private TextView wifiNameTv;
+    private TextView radiusTv;
+    private SeekBar radiusSeekBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +62,10 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
         mAddGeofencesButton = (Button) findViewById(R.id.add_geofences_button);
         mRemoveGeofencesButton = (Button) findViewById(R.id.remove_geofences_button);
         wifiNameTv = (TextView) findViewById(R.id.wifi_name);
+        radiusTv = (TextView) findViewById(R.id.radius_tv);
+        radiusSeekBar = (SeekBar) findViewById(R.id.seekBar);
+        radiusSeekBar.setOnSeekBarChangeListener(this);
+        radiusSeekBar.setMax(500);
 
         mGeofencePendingIntent = null;
     }
@@ -192,6 +200,7 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
                 });
     }
 
+    @Override
     public void showListDialog(final List<ScanResult> scanResults) {
         AlertDialog.Builder builderSingle = new AlertDialog.Builder(this);
         builderSingle.setTitle(R.string.select_wifi);
@@ -216,5 +225,33 @@ public class MainActivity extends FragmentActivity implements MainContract.View 
             }
         });
         builderSingle.show();
+    }
+
+    @Override
+    public void setWifiName(String ssid) {
+        wifiNameTv.setText(ssid);
+    }
+
+    @Override
+    public void setRadius(int radius) {
+        radiusTv.setText(String.valueOf(radius));
+        radiusSeekBar.setProgress(radius - Constants.MIN_RADIUS);
+    }
+
+    @Override
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        int radius = Constants.MIN_RADIUS + progress;
+        radiusTv.setText(String.valueOf(radius));
+        presenter.onRadiusChanged(radius);
+    }
+
+    @Override
+    public void onStartTrackingTouch(SeekBar seekBar) {
+
+    }
+
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
+
     }
 }

@@ -9,6 +9,7 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.text.TextUtils;
 
+import com.vail.myapplication.Constants;
 import com.vail.myapplication.geofencing.GeofenceTransitionsIntentService;
 
 import java.util.List;
@@ -19,8 +20,6 @@ import java.util.List;
 
 public class WifiSensor extends BroadcastReceiver {
 
-    public static final String WIFI_BSSID_KEY = "WIFI_BSSID";
-    public static final String WIFI_NAME_KEY = "WIFI_NAME";
     public static final String WIFI_ACCESSIBILITY_KEY = "WIFI_ACCESSIBILITY";
     private final WifiManager wifiManager;
 
@@ -52,7 +51,7 @@ public class WifiSensor extends BroadcastReceiver {
     }
 
     private void updateCurrentWifiConnection() {
-        String savedWifiBSSID = sharedPreferences.getString(WIFI_BSSID_KEY, null);
+        String savedWifiBSSID = sharedPreferences.getString(Constants.WIFI_BSSID_KEY, null);
         if (TextUtils.isEmpty(savedWifiBSSID)) return;
 
 

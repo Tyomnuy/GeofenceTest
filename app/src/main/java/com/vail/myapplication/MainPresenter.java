@@ -11,6 +11,7 @@ import com.google.android.gms.location.GeofencingClient;
 import com.google.android.gms.location.GeofencingRequest;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.Task;
 import com.vail.myapplication.wifi.WifiSensor;
 
@@ -23,7 +24,7 @@ import static android.content.ContentValues.TAG;
  * Created by Vail on 04.07.17
  */
 
-public class MainPresenter implements MainContract.Presenter {
+public class MainPresenter implements MainContract.Presenter, GoogleMap.OnCameraIdleListener {
 
     private MainContract.View view;
     private SharedPreferences sharedPreferences;
@@ -32,7 +33,7 @@ public class MainPresenter implements MainContract.Presenter {
     private GoogleMap mMap;
     private PendingGeofenceTask mPendingGeofenceTask = PendingGeofenceTask.NONE;
 
-    private int radius = 30;
+    private int radius;
 
     private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 34;
 
@@ -47,6 +48,10 @@ public class MainPresenter implements MainContract.Presenter {
         this.sharedPreferences = sharedPreferences;
         this.wifiSensor = wifiSensor;
         this.geofencingClient = geofencingClient;
+
+        radius = sharedPreferences.getInt(Constants.RADIUS_KEY, 30);
+        view.setWifiName(sharedPreferences.getString(Constants.WIFI_NAME_KEY, "None"));
+        view.setRadius(radius);
 
         mGeofenceList = new ArrayList<>();
         populateGeofenceList();
@@ -84,6 +89,12 @@ public class MainPresenter implements MainContract.Presenter {
     @SuppressWarnings("MissingPermission")
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
+        mMap.setOnCameraIdleListener(this);
+
+        LatLng latLng = mMap.getCameraPosition().target;
+        mMap.clear();
+        mMap.addMarker(new MarkerOptions().position(latLng));
+
         if (!view.checkPermissions()) {
             view.requestPermissions(REQUEST_PERMISSIONS_REQUEST_CODE);
             return;
@@ -117,8 +128,8 @@ public class MainPresenter implements MainContract.Presenter {
         wifiSensor.stop();
         view.setWifiName("None");
         sharedPreferences.edit()
-                .remove(WifiSensor.WIFI_NAME_KEY)
-                .remove(WifiSensor.WIFI_BSSID_KEY)
+                .remove(Constants.WIFI_NAME_KEY)
+                .remove(Constants.WIFI_BSSID_KEY)
                 .apply();
         geofencingClient.removeGeofences(view.getGeofencePendingIntent()).addOnCompleteListener(this);
     }
@@ -166,11 +177,16 @@ public class MainPresenter implements MainContract.Presenter {
         String ssid = scanResult.SSID;
         String bssid = scanResult.BSSID;
         sharedPreferences.edit()
-                .putString(WifiSensor.WIFI_NAME_KEY, ssid)
-                .putString(WifiSensor.WIFI_BSSID_KEY, bssid)
+                .putString(Constants.WIFI_NAME_KEY, ssid)
+                .putString(Constants.WIFI_BSSID_KEY, bssid)
                 .apply();
 
         view.setWifiName(ssid);
+    }
+
+    @Override
+    public void onRadiusChanged(int radius) {
+        this.radius = radius;
     }
 
     @Override
@@ -235,5 +251,12 @@ public class MainPresenter implements MainContract.Presenter {
                 .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
                 .addGeofences(mGeofenceList)
                 .build();
+    }
+
+    @Override
+    public void onCameraIdle() {
+        LatLng latLng = mMap.getCameraPosition().target;
+        mMap.clear();
+        mMap.addMarker(new MarkerOptions().position(latLng));
     }
 }

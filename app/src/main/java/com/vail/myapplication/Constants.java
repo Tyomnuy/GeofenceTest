@@ -29,6 +29,11 @@ public final class Constants {
     private Constants() {
     }
 
+    public static final int MIN_RADIUS = 30;
+
+    public static final String WIFI_BSSID_KEY = "WIFI_BSSID";
+    public static final String WIFI_NAME_KEY = "WIFI_NAME";
+
     public static final String LATITUDE_KEY = "LATITUDE_KEY";
     public static final String LONGITUDE_KEY = "LONGITUDE_KEY";
     public static final String RADIUS_KEY = "RADIUS_KEY";
